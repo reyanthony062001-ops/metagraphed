@@ -54,7 +54,7 @@
     "kv:publish:dry-run": "node scripts/kv-publish-pointer.mjs --dry-run",
     "kv:publish": "node scripts/kv-publish-pointer.mjs --write",
     "cloudflare:verify:dry-run": "node scripts/cloudflare-verify.mjs",
-    "worker:test": "node scripts/validate-api.mjs",
+    "worker:test": "node scripts/worker-test.mjs",
     "worker:deploy:dry-run": "node scripts/worker-deploy-dry-run.mjs",
     "test": "node --test tests/*.test.mjs"
   },

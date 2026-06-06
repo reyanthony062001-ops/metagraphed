@@ -31,7 +31,7 @@ export async function handleRequest(request, env = {}, ctx = {}) {
   const url = new URL(request.url);
 
   if (request.method === "OPTIONS") {
-    return corsPreflight();
+    return corsPreflight(request);
   }
 
   if (url.pathname.startsWith("/rpc/v1/")) {
@@ -39,7 +39,9 @@ export async function handleRequest(request, env = {}, ctx = {}) {
   }
 
   if (!["GET", "HEAD"].includes(request.method)) {
-    return errorResponse("method_not_allowed", "Only GET, HEAD, and OPTIONS are supported.", 405);
+    return errorResponse("method_not_allowed", "Only GET, HEAD, and OPTIONS are supported.", 405, {}, {
+      allow: "GET, HEAD, OPTIONS"
+    });
   }
 
   if (url.pathname === "/api/v1" || url.pathname.startsWith("/api/v1/")) {
@@ -81,7 +83,9 @@ async function handleApiRequest(request, env, url) {
 
 async function handleRpcProxyRequest(request, env, url) {
   if (request.method !== "POST") {
-    return errorResponse("method_not_allowed", "The RPC proxy only accepts POST requests.", 405);
+    return errorResponse("method_not_allowed", "The RPC proxy only accepts POST requests.", 405, {}, {
+      allow: "POST, OPTIONS"
+    });
   }
 
   if (env.METAGRAPH_ENABLE_RPC_PROXY !== "true") {
@@ -348,7 +352,13 @@ async function envelopeResponse(request, payload, cacheProfile) {
   });
 }
 
-function errorResponse(code, message, status = 500, meta = {}) {
+function errorResponse(code, message, status = 500, meta = {}, extraHeaders = {}) {
+  const headers = apiHeaders("short");
+  headers.set("x-metagraph-error-code", code);
+  for (const [key, value] of Object.entries(extraHeaders)) {
+    headers.set(key, value);
+  }
+
   return new Response(JSON.stringify({
     ok: false,
     schema_version: 1,
@@ -360,13 +370,14 @@ function errorResponse(code, message, status = 500, meta = {}) {
     }
   }), {
     status,
-    headers: apiHeaders("short")
+    headers
   });
 }
 
-function corsPreflight() {
+function corsPreflight(request) {
+  const url = new URL(request.url);
   const headers = apiHeaders("short");
-  headers.set("access-control-allow-methods", "GET, HEAD, OPTIONS");
+  headers.set("access-control-allow-methods", url.pathname.startsWith("/rpc/") ? "POST, OPTIONS" : "GET, HEAD, OPTIONS");
   headers.set("access-control-allow-headers", "content-type, if-none-match");
   headers.set("access-control-max-age", "86400");
   return new Response(null, { status: 204, headers });
@@ -377,6 +388,8 @@ function apiHeaders(cacheProfile) {
   headers.set("access-control-allow-origin", "*");
   headers.set("cache-control", `public, max-age=${CACHE_SECONDS[cacheProfile] || CACHE_SECONDS.standard}, stale-while-revalidate=300`);
   headers.set("content-type", JSON_CONTENT_TYPE);
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("x-metagraph-cache-profile", cacheProfile);
   headers.set("vary", "Accept-Encoding");
   return headers;
 }

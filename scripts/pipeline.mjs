@@ -68,6 +68,7 @@ function checkCommands() {
     step("validate:openapi"),
     step("validate:intake"),
     step("validate:workflows"),
+    step("worker:test"),
     step("worker:deploy:dry-run"),
     step("scan:public-safety"),
     step("test")
@@ -99,6 +100,7 @@ function refreshCommands() {
     step("validate:openapi"),
     step("validate:intake"),
     step("validate:workflows"),
+    step("worker:test"),
     step("worker:deploy:dry-run"),
     step("scan:public-safety"),
     step("test")
