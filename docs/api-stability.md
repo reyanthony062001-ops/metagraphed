@@ -139,3 +139,29 @@ Omitting all paging params returns the full collection (back-compatible).
   routes over fetching the largest whole-collection artifacts in the browser.
 - Read freshness from `meta.published_at` (real publish time from the serving
   layer), not `generated_at` (a deterministic content marker).
+
+## Example Queries
+
+Copy-paste against the live beta (`https://metagraph.sh`):
+
+```bash
+# Registry-wide coverage + the completeness scoreboard (the headline metric)
+curl -s https://metagraph.sh/api/v1/coverage | jq '.data.completeness'
+
+# Completeness leaderboard — subnets that most need contributions first
+curl -s 'https://metagraph.sh/api/v1/profiles?sort=completeness_score&order=asc&limit=10' \
+  | jq '.data.profiles[] | {netuid, name, completeness_score}'
+
+# One subnet's full profile (identity, surfaces, gaps)
+curl -s https://metagraph.sh/api/v1/subnets/7/profile | jq '.data'
+
+# Search across the registry
+curl -s 'https://metagraph.sh/api/v1/search?q=gittensor' | jq '.data'
+
+# Probe-derived health for a subnet + its embeddable badge
+curl -s https://metagraph.sh/api/v1/subnets/7/health | jq '.data'
+#   <img src="https://metagraph.sh/metagraph/health/badges/7.svg">
+
+# Worker readiness (not part of /api/v1)
+curl -s https://metagraph.sh/health | jq
+```

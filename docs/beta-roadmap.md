@@ -130,16 +130,19 @@ subnets and demonstrate the product to the broader ecosystem.
 
 ### P2/P3 — Coverage-completeness flywheel (the moat, made visible)
 
-10. **First-class, documented completeness score.** Promote the existing scoring
-    machinery (`public/metagraph/review/profile-completeness.json`, `gaps.json`)
-    into a public, explained per-subnet 0–100 metric plus aggregate registry
-    coverage — not just an internal queue.
-11. **Public coverage leaderboard / "what's missing" view** driven by
-    `public/metagraph/review/enrichment-queue.json` and `gap-priorities.json` — the
-    hero artifact the UI renders.
-12. **README health/coverage SVG badges** (`/metagraph/health/badges/{netuid}.json`
-    is already in the contract) — badges in subnet READMEs create distribution,
-    backlinks, and an adoption flywheel.
+10. **First-class, documented completeness score.** _Done._ `coverage.json`
+    (`/api/v1/coverage`) now carries a `completeness` aggregate — scored count,
+    average/median, fully-complete count, a score histogram, per-dimension
+    coverage, and a methodology pointer — promoted from the internal review
+    queue and typed in `CoverageArtifact`.
+11. **Public coverage leaderboard / "what's missing" view.** _Mostly done:_ the
+    per-subnet leaderboard is queryable at
+    `/api/v1/profiles?sort=completeness_score&order=asc` and the gaps live in
+    `gap-priorities.json`/`enrichment-queue.json`. Remaining is the UI rendering
+    (frontend repo).
+12. **README health/coverage SVG badges.** _Done._ The Worker serves a
+    self-hosted SVG at `/metagraph/health/badges/{netuid}.svg` (rendered from the
+    badge JSON, no shields.io dependency); embedding documented in the README.
 13. **Community completeness flywheel.** The one-file PR / issue intake already
     exists; surface "you can fill this gap" calls to action so coverage improves
     through contributions, not only maintainer effort.
@@ -194,10 +197,20 @@ guarantees); and a handful of copy-paste example queries against the live beta.
 ### Phase 1 — Beta launch
 
 - Confirm a green production publish and a passing `npm run smoke:live`
-  (Finding 3).
+  (Finding 3). _Note: recent `publish-cloudflare` runs are red — confirm whether
+  the Cloudflare secrets are configured (fail-closed) or a real failure._
+- **Done (worker edge hardening, not in original findings):** `/health` readiness
+  probe, time-bounded R2 reads (`r2_timeout` 504), and structured observability
+  logging.
 - Restructure routing to two Workers via zone routes; coordinate the
-  `metagraph-finder` Worker project (architecture section).
-- Ship the frontend handoff kit (Finding 4).
+  `metagraph-finder` Worker project (architecture section). _Gated:_ needs the
+  frontend Worker deployed + DNS/zone-route changes, so the `wrangler.jsonc`
+  `custom_domain` switch is intentionally not yet applied (it would orphan the
+  apex until the UI Worker exists).
+- **Done:** frontend handoff kit — `docs/api-stability.md` (envelope, pagination,
+  cache, headers, error codes, `published_at`, versioning, example queries) plus
+  the generated `openapi.json`/`.d.ts`/client and a README pointer (Finding 4).
+  _Open coordination:_ whether to also publish an npm package.
 - Performance pass: confirm compression and lean the heavy list payloads for
   browser use (Finding 8).
 
@@ -209,10 +222,16 @@ guarantees); and a handful of copy-paste example queries against the live beta.
 
 ### Phase 3 — Coverage-completeness flywheel (post-launch, ongoing)
 
-- Publish the completeness score + methodology (Finding 10).
-- Build the coverage leaderboard / "what's missing" hero artifact (Finding 11).
-- Add README badges (Finding 12), community gap-fill CTAs (Finding 13), and
-  adapter expansion (Finding 14).
+- **Done:** publish the completeness score + methodology in `coverage.json`
+  (Finding 10).
+- **Done:** self-hosted README/coverage SVG badges (Finding 12).
+- Leaderboard/"what's missing" hero view (Finding 11) — data is queryable; UI
+  rendering is frontend work.
+- Community gap-fill CTAs (Finding 13) and adapter expansion (Finding 14).
+- **Recommended follow-up (not yet done):** close the freshness loop — auto-flag
+  and demote surfaces not probed healthy within N days, so "complete" can never
+  drift to "complete but stale/dead." Touches `probes-smoke.mjs` →
+  `curate-baseline.mjs`/`build-artifacts.mjs`.
 
 ## Verification
 
