@@ -87,6 +87,7 @@ import {
 } from "../src/health-serving.mjs";
 import {
   NEURON_COLUMNS,
+  NEURON_INSERT_COLUMNS,
   buildSubnetMetagraph,
   buildSubnetValidators,
   buildNeuronDetail,
@@ -216,11 +217,72 @@ export default {
   },
 };
 
+// Load a staged per-UID metagraph snapshot from R2 into D1 (#1303). The
+// refresh-metagraph CI job fetches Taostats and writes the neuron rows as JSON to
+// R2 (metagraph/neurons-pending.json) using its existing R2 permission; we load
+// them here through the METAGRAPH_HEALTH_DB binding — which needs no API-token D1
+// permission — with PARAMETERIZED inserts (values are always bound, never
+// interpolated, so a tampered/garbage staged file can only fail, never inject
+// SQL), then delete the object so it loads exactly once. Batched to stay under
+// D1's 100-param-per-statement limit (→ 5 rows/statement) and the Worker's
+// subrequest limit.
+export async function loadStagedNeurons(env) {
+  const bucket = env.METAGRAPH_ARCHIVE;
+  const db = env.METAGRAPH_HEALTH_DB;
+  if (!bucket?.get || !db?.prepare) return { ok: false, reason: "unavailable" };
+  const key = "metagraph/neurons-pending.json";
+  const object = await bucket.get(key);
+  if (!object) return { ok: false, reason: "none" };
+  let rows;
+  try {
+    rows = await object.json();
+  } catch {
+    await bucket.delete(key);
+    return { ok: false, reason: "parse_failed" };
+  }
+  rows = Array.isArray(rows)
+    ? rows.filter(
+        (r) => Number.isInteger(r?.netuid) && Number.isInteger(r?.uid),
+      )
+    : [];
+  if (!rows.length) {
+    await bucket.delete(key);
+    return { ok: false, reason: "empty" };
+  }
+  const cols = NEURON_INSERT_COLUMNS;
+  const colList = cols.join(",");
+  const ROWS_PER_STMT = 5;
+  const STMTS_PER_BATCH = 50;
+  const statements = [];
+  for (let i = 0; i < rows.length; i += ROWS_PER_STMT) {
+    const chunk = rows.slice(i, i + ROWS_PER_STMT);
+    const tuples = chunk
+      .map(() => `(${cols.map(() => "?").join(",")})`)
+      .join(",");
+    const values = chunk.flatMap((row) => cols.map((c) => row[c] ?? null));
+    statements.push(
+      db
+        .prepare(`INSERT OR REPLACE INTO neurons (${colList}) VALUES ${tuples}`)
+        .bind(...values),
+    );
+  }
+  for (let i = 0; i < statements.length; i += STMTS_PER_BATCH) {
+    await db.batch(statements.slice(i, i + STMTS_PER_BATCH));
+  }
+  await bucket.delete(key);
+  return { ok: true, rows: rows.length };
+}
+
 // Cron entrypoint. Cloudflare passes the exact cron string that fired in
 // `controller.cron`; the hourly trigger prunes the time-series, every other
 // trigger (the 15-minute one) runs a full operational-health probe sweep.
+
 export async function handleScheduled(controller, env = {}, ctx = {}) {
   const cron = controller?.cron || "";
+  // Token-free per-UID metagraph load (#1303): pick up any R2-staged neuron
+  // snapshot and load it via the D1 binding on whichever cron fires next; it then
+  // self-deletes. Isolated so a load failure never affects the prober/prune below.
+  await loadStagedNeurons(env).catch(() => {});
   if (cron === HEALTH_PRUNE_CRON) {
     // Roll the day's raw checks into the durable daily uptime table BEFORE
     // pruning, so long-term history is never lost when 30-day raw rows are
