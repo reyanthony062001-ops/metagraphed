@@ -68,6 +68,7 @@ import {
   handleSubnetHistory,
   handleSubnetConcentration,
   handleSubnetConcentrationHistory,
+  canonicalSubnetHistoryCachePath,
   canonicalSubnetConcentrationHistoryCachePath,
   handleSubnetTurnover,
   handleAccount,
@@ -1291,13 +1292,19 @@ export async function handleRequest(request, env = {}, ctx = {}) {
       // GROUP BY daily aggregation, deterministic per cron snapshot — edge-cache
       // on last_run_at like the sibling analytics routes (pathname carries the
       // netuid, search carries ?window). Cheap single-row lookups stay uncached.
-      return withEdgeCache(request, ctx, env, "subnet-history", () =>
-        handleSubnetHistory(
-          request,
-          env,
-          Number(subnetHistoryMatch[1]),
-          resolved.url,
-        ),
+      return withEdgeCache(
+        request,
+        ctx,
+        env,
+        "subnet-history",
+        () =>
+          handleSubnetHistory(
+            request,
+            env,
+            Number(subnetHistoryMatch[1]),
+            resolved.url,
+          ),
+        canonicalSubnetHistoryCachePath(resolved.url),
       );
     }
     const metagraphMatch = SUBNET_METAGRAPH_PATH_PATTERN.exec(
