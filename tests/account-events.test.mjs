@@ -137,6 +137,10 @@ test("INGESTED_EVENT_KINDS accepts ColdkeySwapScheduled for kind filters", () =>
   assert.ok(INGESTED_EVENT_KINDS.includes("ColdkeySwapScheduled"));
 });
 
+test("INGESTED_EVENT_KINDS accepts Faucet for testnet account credit filters", () => {
+  assert.ok(INGESTED_EVENT_KINDS.includes("Faucet"));
+});
+
 test("INGESTED_EVENT_KINDS accepts StakeTransferred (cross-coldkey stake move) for kind filters", () => {
   assert.ok(INGESTED_EVENT_KINDS.includes("StakeTransferred"));
 });
