@@ -10,12 +10,14 @@ import {
   RECOVERY,
 } from "@/components/metagraphed/states";
 import { QueryErrorBoundary } from "@/components/metagraphed/error-boundary";
+import { ApiSourceFooter } from "@/components/metagraphed/api-source-footer";
 import {
   EntityHero,
   BrandIcon,
   PrimaryLinksRail,
   CopyableCode,
   SectionAnchor,
+  ShareButton,
 } from "@jsonbored/ui-kit";
 import { ProfileTabs, useActiveTab } from "@/components/metagraphed/profile-tabs";
 import { EndpointsGlance } from "@/components/metagraphed/endpoints-glance";
@@ -133,7 +135,20 @@ function ProviderShell({ slug }: { slug: string }) {
         subtitle={shouldShowProviderSlugSubtitle(p?.name, slug) ? <>· {slug}</> : null}
         description={p?.notes}
         links={
-          <PrimaryLinksRail website={p?.website ?? p?.homepage} docs={p?.docs} repo={p?.repo} />
+          // #5481: Share sits in this single connected bar with the link
+          // icons (not EntityHero's separate `actions` slot, which renders
+          // on its own row below) -- matching SegmentedToggle/ViewModeToggle's
+          // one-shared-border-and-divider look rather than separately spaced,
+          // individually-boxed icon buttons.
+          <div className="inline-flex items-center rounded-md border border-border bg-card divide-x divide-border overflow-hidden">
+            <PrimaryLinksRail
+              bare
+              website={p?.website ?? p?.homepage}
+              docs={p?.docs}
+              repo={p?.repo}
+            />
+            <ShareButton connected />
+          </div>
         }
         stats={[
           { label: "Endpoints", value: formatNumber(summary?.endpoint_count) },
@@ -175,6 +190,10 @@ function ProviderShell({ slug }: { slug: string }) {
           {summary?.by_layer ? <BreakdownCard title="By layer" data={summary.by_layer} /> : null}
         </aside>
       </div>
+
+      <ApiSourceFooter
+        paths={[`/api/v1/providers/${slug}`, `/api/v1/providers/${slug}/endpoints`]}
+      />
     </>
   );
 }

@@ -17,13 +17,7 @@ import {
   Filter,
 } from "lucide-react";
 import { AppShell } from "@/components/metagraphed/app-shell";
-import {
-  EmptyState,
-  PageHeading,
-  Skeleton,
-  StaleBanner,
-  RECOVERY,
-} from "@/components/metagraphed/states";
+import { EmptyState, PageHeading, Skeleton, RECOVERY } from "@/components/metagraphed/states";
 import { QueryErrorBoundary } from "@/components/metagraphed/error-boundary";
 import { EvidencePanel } from "@/components/metagraphed/evidence-panel";
 import { ProfileTabs, useActiveTab } from "@/components/metagraphed/profile-tabs";
@@ -107,6 +101,7 @@ import type {
 } from "@/lib/metagraphed/types";
 import { IncidentTimeline } from "@/components/metagraphed/incident-timeline";
 import { TimeRangeProvider } from "@/components/metagraphed/analytics/time-range-context";
+import { ApiSourceFooter } from "@/components/metagraphed/api-source-footer";
 import { SubnetMasthead } from "@/components/metagraphed/subnet-masthead";
 import { OperationalPanel } from "@/components/metagraphed/operational-panel";
 import { ResourceExplorer } from "@/components/metagraphed/resource-explorer";
@@ -288,21 +283,14 @@ function ProfileShell({ netuid }: { netuid: number }) {
           generatedAt={meta?.generated_at}
           stale={stale}
           evidenceCount={evidenceCount}
-          banner={
-            stale ? (
-              <StaleBanner
-                generatedAt={meta?.generated_at}
-                refreshQueryKeys={[
-                  subnetProfileQuery(netuid).queryKey,
-                  subnetSurfacesQuery(netuid).queryKey,
-                  subnetEndpointsQuery(netuid).queryKey,
-                  subnetHealthQuery(netuid).queryKey,
-                  subnetCandidatesQuery(netuid).queryKey,
-                ]}
-                refreshLabel="Refresh health now"
-              />
-            ) : null
-          }
+          refreshQueryKeys={[
+            subnetProfileQuery(netuid).queryKey,
+            subnetSurfacesQuery(netuid).queryKey,
+            subnetEndpointsQuery(netuid).queryKey,
+            subnetHealthQuery(netuid).queryKey,
+            subnetCandidatesQuery(netuid).queryKey,
+          ]}
+          refreshLabel="Refresh health now"
         />
 
         <SubnetValidatorsPreview netuid={netuid} />
@@ -379,6 +367,14 @@ function ProfileShell({ netuid }: { netuid: number }) {
             ← All subnets
           </Link>
         </div>
+
+        <ApiSourceFooter
+          paths={[
+            `/api/v1/subnets/${netuid}/profile`,
+            `/api/v1/subnets/${netuid}/overview`,
+            `/api/v1/subnets/${netuid}/identity-history`,
+          ]}
+        />
       </SubnetFilterProvider>
     </TimeRangeProvider>
   );
