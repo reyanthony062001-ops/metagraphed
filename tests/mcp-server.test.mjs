@@ -12701,6 +12701,7 @@ describe("MCP account tools (get_account + events + subnets)", () => {
       "get_account",
       "get_account_events",
       "get_account_subnets",
+      "get_account_entities",
     ]) {
       const res = await callTool(name, { ss58: "not-an-address" }, { env: {} });
       assert.equal(
@@ -12724,6 +12725,67 @@ describe("MCP account tools (get_account + events + subnets)", () => {
 
     const subnets = await callTool("get_account_subnets", { ss58: SS58 });
     assert.equal(subnets.body.result.structuredContent.subnet_count, 0);
+
+    // get_account (#6739) always joins the labels field, cold or not.
+    assert.deepEqual(summary.body.result.structuredContent.labels, []);
+
+    const entities = await callTool("get_account_entities", { ss58: SS58 });
+    assert.equal(entities.body.result.isError, false);
+    assert.deepEqual(entities.body.result.structuredContent.labels, []);
+    assert.equal(entities.body.result.structuredContent.ownership_tie_count, 0);
+    assert.deepEqual(entities.body.result.structuredContent.ownership_ties, []);
+  });
+
+  test("get_account and get_account_entities join a populated entities.json artifact's labels", async () => {
+    const deps = makeDeps({
+      "/metagraph/entities.json": {
+        schema_version: 1,
+        generated_at: null,
+        entities: [
+          {
+            schema_version: 1,
+            ss58: SS58,
+            name: "Example Foundation",
+            category: "foundation",
+            source_urls: ["https://example.org/proof"],
+            review: { state: "maintainer-reviewed" },
+          },
+        ],
+      },
+    });
+    const summary = await callTool("get_account", { ss58: SS58 }, { deps });
+    assert.equal(summary.body.result.structuredContent.labels.length, 1);
+    assert.equal(
+      summary.body.result.structuredContent.labels[0].name,
+      "Example Foundation",
+    );
+
+    const entities = await callTool(
+      "get_account_entities",
+      { ss58: SS58 },
+      { deps },
+    );
+    assert.equal(entities.body.result.structuredContent.labels.length, 1);
+  });
+
+  test("get_account_entities: a successful DATA_API response wins over the schema-stable cold fallback", async () => {
+    const env = {
+      METAGRAPH_SUBNET_OWNERSHIP_SOURCE: "postgres",
+      DATA_API: {
+        fetch: async () =>
+          Response.json({
+            schema_version: 1,
+            ss58: SS58,
+            ownership_tie_count: 1,
+            ownership_ties: [
+              { netuid: 7, role: "gained_ownership", block_number: 100 },
+            ],
+          }),
+      },
+    };
+    const res = await callTool("get_account_entities", { ss58: SS58 }, { env });
+    assert.equal(res.body.result.structuredContent.ownership_tie_count, 1);
+    assert.equal(res.body.result.structuredContent.ownership_ties[0].netuid, 7);
   });
 
   test("populated account payloads validate against their declared outputSchemas", async () => {

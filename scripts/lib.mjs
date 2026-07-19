@@ -13,6 +13,7 @@ import {
   artifactRelativePath,
   artifactStorageTierForRelativePath,
 } from "../src/artifact-storage.mjs";
+import { entityLabelsIndex } from "../src/entity-labels.mjs";
 import { sanitizeChainText, slugify } from "./lib/formatting.mjs";
 
 // Resolve via fileURLToPath rather than `new URL("..").pathname` so the repo
@@ -593,6 +594,21 @@ export async function loadProviders() {
     if (provider?.id) byId.set(provider.id, provider);
   }
   return [...byId.values()].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+// Community-contributable entity labels (#6737/#6738): flat objects in
+// registry/entities/<ss58>.json, same single-file-per-entity shape as
+// loadProviders() above. The directory doesn't exist until the first
+// contribution lands -- listJsonFiles already tolerates ENOENT, so this
+// naturally returns [] rather than throwing.
+export async function loadEntities() {
+  const files = await listJsonFiles(path.join(repoRoot, "registry/entities"));
+  const entities = await Promise.all(files.map(readJson));
+  // Dedup-by-ss58 delegated to entityLabelsIndex (src/entity-labels.mjs,
+  // already unit-tested there) rather than re-implemented inline here.
+  return [...entityLabelsIndex(entities).values()].sort((a, b) =>
+    a.ss58.localeCompare(b.ss58),
+  );
 }
 
 export async function loadSubnets() {
